@@ -1,0 +1,29 @@
+# Git
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local storage & data
+data_storage/
+storage_data/
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+env/
+venv/
+
+# Monorepo other projects & docs
+mobile/
+docs/
+temp/
