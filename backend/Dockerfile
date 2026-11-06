@@ -23,9 +23,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Create storage directory for uploaded and generated images
 RUN mkdir -p /app/data_storage/inputs /app/data_storage/outputs /app/data_storage/tmp
 
-# Copy backend application source code and test suite
+# Copy backend application source code, migrations and test suite
 COPY app/ ./app/
 COPY tests/ ./tests/
+COPY alembic.ini ./alembic.ini
+COPY alembic/ ./alembic/
 
 EXPOSE 8000
 

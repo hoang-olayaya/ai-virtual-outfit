@@ -1,0 +1,17 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend",
+    "C:/Users/Admin/AppData/Local/Python/pythoncore-3.14-64/Lib",
+    "C:/Users/Admin/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages",
+    "C:/Users/Admin/AppData/Roaming/Python/Python314/site-packages"
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.cwd": "${workspaceFolder}/backend",
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.14-64;C:\\Users\\Admin\\AppData\\Local\\Python\\pythoncore-3.14-64\\Scripts;${env:PATH}"
+  }
+}

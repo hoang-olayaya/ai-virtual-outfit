@@ -48,6 +48,8 @@ services:
       - storage_data:/app/data_storage
       - ../backend/app:/app/app
       - ../backend/tests:/app/tests
+      - ../backend/alembic:/app/alembic
+      - ../backend/alembic.ini:/app/alembic.ini
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +74,8 @@ services:
     volumes:
       - storage_data:/app/data_storage
       - ../backend/app:/app/app
+      - ../backend/alembic:/app/alembic
+      - ../backend/alembic.ini:/app/alembic.ini
     depends_on:
       redis:
         condition: service_healthy

@@ -39,8 +39,35 @@ class Settings(BaseSettings):
     # Local file storage
     STORAGE_LOCAL_PATH: str = "/app/data_storage"
 
-    # External AI Provider (fal.ai) - Optional in bootstrap phase
+    # Image Upload & Validation Limits
+    UPLOAD_MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
+    UPLOAD_MIN_DIMENSION_PX: int = 64
+    UPLOAD_MAX_DIMENSION_PX: int = 4096
+    UPLOAD_MAX_PIXELS: int = 16_777_216  # 4096 * 4096 (~16 MP)
+    UPLOAD_ALLOWED_FORMATS: List[str] = ["JPEG", "PNG", "WEBP"]
+
+    # Task Queue & Worker Execution Settings
+    TASK_PUBLISHER_BACKEND: str = "celery"  # "celery" | "fake"
+    WORKER_MAX_RETRIES: int = 2
+    WORKER_RETRY_BACKOFF_SECONDS: int = 2
+
+    # AI Provider Settings ("fake" in B04; "fal" from B05/B06)
+    AI_PROVIDER: str = "fake"
+    FAKE_AI_PROCESSING_DELAY_SECONDS: float = 0.0
+
+    # External AI Provider (fal.ai) - Optional in bootstrap/B04; configured in B05/B06
     FAL_KEY: Union[str, None] = None
+    FAL_MODEL_ID: str = "fal-ai/cat-vton"
+    FAL_CLOTH_TYPE: str = "upper"
+    FAL_QUEUE_BASE_URL: str = "https://queue.fal.run"
+    FAL_STORAGE_UPLOAD_URL: str = (
+        "https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3"
+    )
+    FAL_HTTP_TIMEOUT_SECONDS: float = 30.0
+    FAL_POLL_INTERVAL_SECONDS: float = 2.0
+    FAL_POLL_TIMEOUT_SECONDS: float = 180.0
+    FAL_DOWNLOAD_MAX_RETRIES: int = 3
+    FAL_DOWNLOAD_RETRY_BACKOFF_SECONDS: float = 1.0
 
 
 settings = Settings()

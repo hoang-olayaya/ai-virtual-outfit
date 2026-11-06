@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_v1_router
 from app.api.v1.health import router as health_router
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
 from app.core.logging import logger, setup_logging
 
 
@@ -25,6 +26,9 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# Register standardized global error handlers
+register_exception_handlers(app)
 
 # Configure CORS
 if settings.CORS_ORIGINS:

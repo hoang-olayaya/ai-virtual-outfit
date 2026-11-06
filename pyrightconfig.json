@@ -1,0 +1,15 @@
+{
+  "include": [
+    "backend"
+  ],
+  "venvPath": "C:/Users/Admin/AppData/Local/Python",
+  "venv": "pythoncore-3.14-64",
+  "extraPaths": [
+    "backend",
+    "C:/Users/Admin/AppData/Roaming/Python/Python314/site-packages"
+  ],
+  "pythonVersion": "3.14",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none"
+}
