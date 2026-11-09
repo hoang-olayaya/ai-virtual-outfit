@@ -81,22 +81,56 @@ Các cơ chế phòng vệ then chốt trong Worker Pipeline (B06):
 - **Dual-Layer Secret Scrubbing:** Lọc bỏ `FAL_KEY` ở cả tầng Console Logging lẫn cột `error_message` trong PostgreSQL.
 - **Safe Transaction Cleanup:** Dọn dẹp an toàn các file kết quả mồ côi nếu DB transaction gặp sự cố mà không che lấp ngoại lệ gốc.
 
-### 8. Chạy kiểm thử tự động (Pytest)
+### 8. Quản lý Lịch sử & Tải ảnh So sánh (History & Input Media - B07)
 ```powershell
-# Chạy toàn bộ test (Unit + Integration + Contract) trong container:
-docker compose -f infrastructure/compose.yaml run --rm api pytest tests/unit tests/integration tests/contract -v
+# 1. Lưu kết quả thử đồ vào lịch sử (POST /api/v1/try-ons/{id}/save -> 200 OK idempotent)
+curl -X POST "http://localhost:8000/api/v1/try-ons/<job_id>/save"
 
-# Chạy Unit, Integration & Contract tests trực tiếp trên môi trường local (uv/python):
-uv run pytest backend/tests/unit backend/tests/integration backend/tests/contract -v
+# 2. Xem danh sách lịch sử phân trang (GET /api/v1/history?limit=10&offset=0 -> 200 OK)
+curl "http://localhost:8000/api/v1/history?limit=10&offset=0"
 
-# Chạy kiểm thử tích hợp riêng cho Real Worker Pipeline (B06 - MockTransport, 0 VNĐ):
-uv run pytest backend/tests/integration/test_real_worker_pipeline.py -v
+# 3. Xem chi tiết một mục lịch sử (GET /api/v1/history/{job_id} -> 200 OK)
+curl "http://localhost:8000/api/v1/history/<job_id>"
 
-# Chạy Opt-in Paid Smoke Test với fal.ai thật (chỉ chạy 1 request khi đã cấu hình FAL_KEY trong .env):
-$env:RUN_FAL_SMOKE="1"; uv run pytest backend/tests/external/test_fal_smoke.py -v -s; Remove-Item Env:\RUN_FAL_SMOKE
+# 4. Tải ảnh đầu vào để so sánh Trước / Sau (GET /api/v1/try-ons/{job_id}/inputs/{kind})
+curl "http://localhost:8000/api/v1/try-ons/<job_id>/inputs/person" --output person.jpg
+curl "http://localhost:8000/api/v1/try-ons/<job_id>/inputs/garment" --output garment.png
+
+# 5. Xóa một mục khỏi lịch sử (DELETE /api/v1/history/{job_id} -> 204 No Content)
+curl -X DELETE "http://localhost:8000/api/v1/history/<job_id>"
 ```
 
-### 9. Dừng các dịch vụ
+### 9. Công cụ Vận hành & Tự phục hồi (Reliability & Sweeper - B08)
+```powershell
+# 1. Tự động đối soát và cứu hộ các job bị treo (Reconciler CLI):
+docker compose -f infrastructure/compose.yaml exec api python -m app.maintenance.reconcile_jobs
+
+# 2. Dọn dẹp file tạm .part và thư mục ảnh mồ côi kèm Grace Period 15 phút (Sweeper CLI):
+docker compose -f infrastructure/compose.yaml exec api python -m app.maintenance.cleanup_files
+```
+
+### 10. Chạy kiểm thử tự động (Pytest) & Repeatable E2E Smoke Test
+```powershell
+# Chạy toàn bộ 135 tests (Unit + Integration + Contract) trong container api (Target: 135 passed, 0 skipped, 0 failed):
+docker compose -f infrastructure/compose.yaml run --rm -e DATABASE_URL=postgresql+asyncpg://postgres:postgres_password_dev@postgres:5432/virtual_outfit_test_db api pytest tests/unit tests/integration tests/contract -v
+
+# Chạy test suite trên môi trường host với test database cô lập:
+$env:DATABASE_URL="postgresql+asyncpg://postgres:postgres_password_dev@localhost:5432/virtual_outfit_test_db"
+pytest backend/tests/unit backend/tests/integration backend/tests/contract -v
+Remove-Item Env:\DATABASE_URL
+
+# Chạy kịch bản kiểm thử End-to-End tự động lặp lại (10 bước hoàn chỉnh, 0 VNĐ):
+powershell -ExecutionPolicy Bypass -File scripts/smoke_e2e_backend.ps1
+
+# Chạy Opt-in Paid Smoke Test với fal.ai thật (khi đã cấu hình FAL_KEY trong .env):
+$env:RUN_FAL_SMOKE="1"; pytest backend/tests/external/test_fal_smoke.py -v -s; Remove-Item Env:\RUN_FAL_SMOKE
+```
+
+### 11. Trạng thái Milestone
+- **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean).
+- **Tiếp theo:** Mở khóa **Phase F01 — Flutter Shell, go_router, Dio & DTOs**.
+
+### 12. Dừng các dịch vụ
 ```powershell
 docker compose -f infrastructure/compose.yaml down
 ```
