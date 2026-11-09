@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List, Optional, Sequence
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Sequence, Set
 import uuid
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -223,3 +223,87 @@ class JobRepository:
         result = await self.session.execute(stmt)
         rowcount = getattr(result, "rowcount", 0)
         return int(rowcount or 0) > 0
+
+    async def find_stale_processing_jobs(
+        self,
+        stale_threshold_seconds: int,
+        limit: int = 100,
+    ) -> Sequence[TryOnJob]:
+        """
+        Query jobs stuck in 'processing' status whose updated_at timestamp is older
+        than the specified stale threshold.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(0, stale_threshold_seconds))
+        stmt = (
+            select(TryOnJob)
+            .where(
+                TryOnJob.status == JobStatus.PROCESSING,
+                TryOnJob.updated_at <= cutoff,
+            )
+            .order_by(TryOnJob.updated_at.asc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def find_stuck_queued_jobs(
+        self,
+        queued_timeout_seconds: int,
+        limit: int = 100,
+    ) -> Sequence[TryOnJob]:
+        """
+        Query jobs stuck in 'queued' status whose created_at timestamp is older
+        than the specified timeout threshold.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(0, queued_timeout_seconds))
+        stmt = (
+            select(TryOnJob)
+            .where(
+                TryOnJob.status == JobStatus.QUEUED,
+                TryOnJob.created_at <= cutoff,
+            )
+            .order_by(TryOnJob.created_at.asc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def requeue_stale_job(
+        self,
+        job_id: uuid.UUID,
+        increment_retry: bool = True,
+    ) -> Optional[TryOnJob]:
+        """
+        Atomically transition a stale 'processing' job back to 'queued',
+        optionally incrementing retry_count. Guarantees atomic recovery.
+        """
+        values = {
+            "status": JobStatus.QUEUED,
+            "updated_at": func.now(),
+        }
+        if increment_retry:
+            values["retry_count"] = TryOnJob.retry_count + 1
+
+        stmt = (
+            update(TryOnJob)
+            .where(TryOnJob.id == job_id, TryOnJob.status == JobStatus.PROCESSING)
+            .values(**values)
+            .returning(TryOnJob)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_existing_job_ids(
+        self,
+        job_ids: Sequence[uuid.UUID],
+    ) -> Set[uuid.UUID]:
+        """
+        Given a sequence of job UUIDs, query PostgreSQL to find which ones exist.
+        Returns a set of UUIDs present in the database.
+        """
+        if not job_ids:
+            return set()
+        unique_ids = list(set(job_ids))
+        stmt = select(TryOnJob.id).where(TryOnJob.id.in_(unique_ids))
+        result = await self.session.execute(stmt)
+        return set(result.scalars().all())

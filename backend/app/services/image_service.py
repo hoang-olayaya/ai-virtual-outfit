@@ -2,8 +2,9 @@ import mimetypes
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
+from app.core.config import settings
 from app.core.logging import logger
 from app.services.upload_validator import UploadValidator, ValidatedImage
 from app.storage.local_storage import LocalStorageAdapter
@@ -207,4 +208,29 @@ class ImageService:
             outputs_deleted,
         )
         return inputs_deleted, outputs_deleted
+
+    async def cleanup_expired_temp_files(self, max_age_seconds: Optional[int] = None) -> int:
+        """Scan 'tmp/' directory and delete expired '.part' files."""
+        ttl = max_age_seconds if max_age_seconds is not None else settings.TMP_FILE_TTL_SECONDS
+        return await self.storage.cleanup_temp_files(ttl)
+
+    async def list_stored_job_ids(self, kind: str = "inputs") -> List[uuid.UUID]:
+        """
+        List all job UUID directories stored under 'inputs/' or 'outputs/'.
+        Non-UUID directory names are ignored.
+        """
+        if kind not in ("inputs", "outputs"):
+            raise ValueError(f"Invalid kind '{kind}', must be 'inputs' or 'outputs'.")
+        dir_names = await self.storage.list_subdirectories(kind)
+        valid_uuids: List[uuid.UUID] = []
+        for name in dir_names:
+            try:
+                valid_uuids.append(uuid.UUID(name))
+            except (ValueError, TypeError):
+                continue
+        return valid_uuids
+
+    def get_directory_mtime(self, relative_dir: str) -> float:
+        """Get the modification time of a directory on storage."""
+        return self.storage.get_directory_mtime_sync(relative_dir)
 

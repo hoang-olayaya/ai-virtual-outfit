@@ -45,6 +45,11 @@ class TryOnService:
         cleaned = idempotency_key.strip()
         if not cleaned:
             return None
+        if "\x00" in cleaned or any(ord(c) < 32 for c in cleaned):
+            raise InvalidIdempotencyKeyError(
+                message="Idempotency-Key header contains invalid control characters.",
+                details={"key": "contains_control_characters"},
+            )
         if len(cleaned) > _MAX_IDEMPOTENCY_KEY_LENGTH:
             raise InvalidIdempotencyKeyError(
                 message=f"Idempotency-Key header must not exceed {_MAX_IDEMPOTENCY_KEY_LENGTH} characters.",

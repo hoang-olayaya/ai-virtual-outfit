@@ -69,5 +69,13 @@ class Settings(BaseSettings):
     FAL_DOWNLOAD_MAX_RETRIES: int = 3
     FAL_DOWNLOAD_RETRY_BACKOFF_SECONDS: float = 1.0
 
+    # Reliability, Maintenance & Recovery Settings (B08)
+    STALE_JOB_THRESHOLD_SECONDS: int = 300  # 5 minutes
+    QUEUED_JOB_TIMEOUT_SECONDS: int = 600  # 10 minutes
+    TMP_FILE_TTL_SECONDS: int = 3600  # 1 hour
+    ORPHAN_DIR_GRACE_PERIOD_SECONDS: int = 900  # 15 minutes
+    CELERY_TASK_TIME_LIMIT: int = 300  # 5 minutes hard limit
+    CELERY_TASK_SOFT_TIME_LIMIT: int = 240  # 4 minutes soft limit
+
 
 settings = Settings()

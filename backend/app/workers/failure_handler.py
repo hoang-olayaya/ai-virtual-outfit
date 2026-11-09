@@ -70,7 +70,7 @@ class FailureHandler:
                 retryable,
             )
 
-        if isinstance(exc, (TimeoutError, ConnectionError)):
+        if isinstance(exc, (TimeoutError, ConnectionError)) or type(exc).__name__ == "SoftTimeLimitExceeded":
             return (
                 ErrorCode.AI_PROVIDER_TIMEOUT.value,
                 str(exc) or "Operation timed out during try-on execution.",

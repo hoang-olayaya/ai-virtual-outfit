@@ -8,7 +8,7 @@ from app.services.job_service import JobService
 
 router = APIRouter(prefix="/try-ons", tags=["media"])
 
-_PRIVATE_CACHE_HEADERS = {"Cache-Control": "private, no-cache"}
+_PRIVATE_CACHE_HEADERS = {"Cache-Control": "private, no-cache, no-store, must-revalidate"}
 
 
 @router.get(

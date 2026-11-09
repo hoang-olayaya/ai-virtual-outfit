@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import shutil
+import time
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Union
@@ -256,4 +257,78 @@ class LocalStorageAdapter:
     async def delete_directory(self, relative_dir: Union[str, Path]) -> bool:
         """Asynchronously delete a nested directory inside storage."""
         return await asyncio.to_thread(self.delete_directory_sync, relative_dir)
+
+    def list_subdirectories_sync(self, relative_dir: Union[str, Path]) -> list[str]:
+        """
+        Synchronously list directory names directly inside a safe subdirectory (e.g. 'inputs', 'outputs').
+        Returns a list of directory name strings.
+        """
+        posix_rel = self._validate_relative_path_Input(relative_dir)
+        target_dir = self.resolve_safe_path(posix_rel)
+        try:
+            if not target_dir.exists() or not target_dir.is_dir():
+                return []
+            return [entry.name for entry in target_dir.iterdir() if entry.is_dir()]
+        except OSError as exc:
+            logger.error("Failed to list subdirectories in '%s': %s", posix_rel, exc)
+            raise StorageError(
+                error_code=ErrorCode.STORAGE_UNAVAILABLE,
+                message="Failed to list subdirectories from storage.",
+            ) from exc
+
+    async def list_subdirectories(self, relative_dir: Union[str, Path]) -> list[str]:
+        """Asynchronously list directory names inside a safe subdirectory."""
+        return await asyncio.to_thread(self.list_subdirectories_sync, relative_dir)
+
+    def get_directory_mtime_sync(self, relative_dir: Union[str, Path]) -> float:
+        """
+        Return the last modified time (epoch seconds float) of a safe directory.
+        Raises StorageError if directory does not exist or stat fails.
+        """
+        posix_rel = self._validate_relative_path_Input(relative_dir)
+        target_dir = self.resolve_safe_path(posix_rel)
+        try:
+            return target_dir.stat().st_mtime
+        except OSError as exc:
+            logger.error("Failed to get mtime for directory '%s': %s", posix_rel, exc)
+            raise StorageError(
+                error_code=ErrorCode.STORAGE_UNAVAILABLE,
+                message="Failed to get directory modification time from storage.",
+            ) from exc
+
+    def cleanup_temp_files_sync(self, max_age_seconds: int) -> int:
+        """
+        Synchronously scan 'tmp/' directory and delete all '.part' files older than max_age_seconds.
+        Returns the number of deleted files.
+        """
+        resolved_root = self.ensure_base_dirs()
+        tmp_dir = resolved_root / "tmp"
+        if not tmp_dir.exists():
+            return 0
+
+        now = time.time()
+        deleted_count = 0
+        try:
+            for entry in tmp_dir.iterdir():
+                if entry.is_file() and entry.name.endswith(".part"):
+                    try:
+                        file_age = now - entry.stat().st_mtime
+                        if file_age >= max_age_seconds:
+                            entry.unlink()
+                            deleted_count += 1
+                            logger.info("Deleted stale temporary file: %s (age=%.1fs)", entry.name, file_age)
+                    except OSError as file_err:
+                        logger.warning("Could not delete stale temp file %s: %s", entry.name, file_err)
+        except OSError as exc:
+            logger.error("Failed scanning tmp directory during cleanup: %s", exc)
+            raise StorageError(
+                error_code=ErrorCode.STORAGE_UNAVAILABLE,
+                message="Failed to scan temporary storage directory.",
+            ) from exc
+
+        return deleted_count
+
+    async def cleanup_temp_files(self, max_age_seconds: int) -> int:
+        """Asynchronously scan 'tmp/' directory and delete stale '.part' files."""
+        return await asyncio.to_thread(self.cleanup_temp_files_sync, max_age_seconds)
 

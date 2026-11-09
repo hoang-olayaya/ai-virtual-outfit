@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import io
 from pathlib import Path
-from typing import AsyncGenerator, Dict, Generator, Optional, Tuple
+from typing import AsyncGenerator, Dict, Generator, Optional, Sequence, Set, Tuple
 import uuid
 import httpx
 import pytest
@@ -278,6 +278,53 @@ class InMemoryJobRepository(JobRepository):
             return True
         return False
 
+    async def find_stale_processing_jobs(
+        self,
+        stale_threshold_seconds: int,
+        limit: int = 100,
+    ) -> Sequence[TryOnJob]:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(0, stale_threshold_seconds))
+        stale = [
+            j for j in self._working.values()
+            if j.status == JobStatus.PROCESSING and (j.updated_at or j.created_at) <= cutoff
+        ]
+        stale.sort(key=lambda x: x.updated_at or x.created_at)
+        return stale[:limit]
+
+    async def find_stuck_queued_jobs(
+        self,
+        queued_timeout_seconds: int,
+        limit: int = 100,
+    ) -> Sequence[TryOnJob]:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(0, queued_timeout_seconds))
+        stuck = [
+            j for j in self._working.values()
+            if j.status == JobStatus.QUEUED and j.created_at <= cutoff
+        ]
+        stuck.sort(key=lambda x: x.created_at)
+        return stuck[:limit]
+
+    async def requeue_stale_job(
+        self,
+        job_id: uuid.UUID,
+        increment_retry: bool = True,
+    ) -> Optional[TryOnJob]:
+        job = self._working.get(job_id)
+        if job is None or job.status != JobStatus.PROCESSING:
+            return None
+        now = datetime.now(timezone.utc)
+        job.status = JobStatus.QUEUED
+        job.updated_at = now
+        if increment_retry:
+            job.retry_count += 1
+        return job
+
+    async def get_existing_job_ids(
+        self,
+        job_ids: Sequence[uuid.UUID],
+    ) -> Set[uuid.UUID]:
+        return {jid for jid in job_ids if jid in self._working}
+
 
 class InMemoryHistoryRepository(HistoryRepository):
     """
@@ -427,6 +474,12 @@ async def api_job_repository() -> AsyncGenerator[JobRepository, None]:
         await engine.dispose()
     else:
         yield InMemoryJobRepository()
+
+
+@pytest_asyncio.fixture
+async def job_repository(api_job_repository: JobRepository) -> JobRepository:
+    """Convenience alias for api_job_repository."""
+    return api_job_repository
 
 
 @pytest_asyncio.fixture
