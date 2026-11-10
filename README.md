@@ -141,7 +141,7 @@ flutter pub get
 # 2. Phân tích mã nguồn tĩnh (Target: No issues found!)
 flutter analyze
 
-# 3. Chạy toàn bộ Unit, Widget & TCP Socket Connectivity Tests (Target: 19/19 passed)
+# 3. Chạy toàn bộ Unit, Widget & TCP Socket Connectivity Tests (Target: 27/27 passed)
 flutter test --reporter expanded
 
 # 4. Chạy ứng dụng trên Android Emulator (mặc định dùng http://10.0.2.2:8000)
@@ -154,7 +154,9 @@ flutter run --dart-define=API_BASE_URL=http://<LAN_IP_CUA_MAY_TINH>:8000
 ### 12. Trạng thái Milestone
 - **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean).
 - **Phase F01 — Flutter Shell, go_router, Dio & DTOs:** **DONE** (`flutter analyze` 0 issues; 19/19 Flutter unit/widget/socket tests PASS; 6 màn hình khung + `TryOnRepository` + `HistoryRepository` + `ApiException` mapping hoàn chỉnh).
-- **Tiếp theo:** Mở khóa **Phase F02 — UploadScreen, PreviewScreen, image_picker & TryOnDraftController**.
+- **Phase F02 — UploadScreen, PreviewScreen, image_picker & TryOnDraftController:** **DONE** (`TryOnDraftController` quản lý trạng thái nháp bất biến, đóng picker không mất ảnh cũ, kiểm tra sớm dung lượng/file rỗng, xem trước song song trên `PreviewScreen`).
+- **Phase F03 — Submit + Processing + Polling:** **DONE** (`flutter analyze` 0 issues; 27/27 Flutter tests PASS; `TryOnSubmissionController` chống double-submit & bảo toàn `Idempotency-Key` theo fingerprint (T10); `JobStatusController` chạy single-flight polling loop, chịu lỗi mạng tạm thời T09 `network failure != job failed`, tạm dừng/tiếp tục theo `AppLifecycleState`, và tự động điều hướng sang `ResultScreen` khi `succeeded`).
+- **Tiếp theo:** Mở khóa **Phase F04 — ResultScreen, Before/After Compare, Save & Share**.
 
 ### 13. Dừng các dịch vụ
 ```powershell

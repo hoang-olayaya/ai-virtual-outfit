@@ -17,6 +17,7 @@ class AppConfig {
     this.receiveTimeout = const Duration(seconds: 30),
     this.sendTimeout = const Duration(seconds: 30),
     this.pollingInterval = const Duration(seconds: 2),
+    this.maxPollingDuration = const Duration(minutes: 5),
   });
 
   /// Default base URL for Android Emulator (maps to host loopback 127.0.0.1).
@@ -45,6 +46,9 @@ class AppConfig {
 
   /// Default polling interval for active try-on jobs.
   final Duration pollingInterval;
+
+  /// Maximum duration to keep polling an active job before surfacing a client-side timeout.
+  final Duration maxPollingDuration;
 
   /// Builds [AppConfig] using `--dart-define=API_BASE_URL` when provided,
   /// or selects the platform-appropriate local development default.
@@ -111,6 +115,7 @@ class AppConfig {
     Duration? receiveTimeout,
     Duration? sendTimeout,
     Duration? pollingInterval,
+    Duration? maxPollingDuration,
   }) {
     return AppConfig(
       baseUrl: baseUrl != null ? normalizeBaseUrl(baseUrl) : this.baseUrl,
@@ -119,6 +124,7 @@ class AppConfig {
       receiveTimeout: receiveTimeout ?? this.receiveTimeout,
       sendTimeout: sendTimeout ?? this.sendTimeout,
       pollingInterval: pollingInterval ?? this.pollingInterval,
+      maxPollingDuration: maxPollingDuration ?? this.maxPollingDuration,
     );
   }
 
@@ -131,7 +137,8 @@ class AppConfig {
         other.connectTimeout == connectTimeout &&
         other.receiveTimeout == receiveTimeout &&
         other.sendTimeout == sendTimeout &&
-        other.pollingInterval == pollingInterval;
+        other.pollingInterval == pollingInterval &&
+        other.maxPollingDuration == maxPollingDuration;
   }
 
   @override
@@ -142,6 +149,7 @@ class AppConfig {
     receiveTimeout,
     sendTimeout,
     pollingInterval,
+    maxPollingDuration,
   );
 }
 

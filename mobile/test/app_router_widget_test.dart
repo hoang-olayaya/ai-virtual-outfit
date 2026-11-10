@@ -50,6 +50,7 @@ class _FakeBackendAdapter implements HttpClientAdapter {
   _FakeBackendAdapter({this.shouldFail = false});
 
   final bool shouldFail;
+  int _statusPollCount = 0;
 
   @override
   Future<ResponseBody> fetch(
@@ -95,6 +96,59 @@ class _FakeBackendAdapter implements HttpClientAdapter {
       );
     }
 
+    if (options.method == 'POST' && options.path == '/api/v1/try-ons') {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'job_id': PreviewScreen.sampleDemoJobId,
+          'status': 'queued',
+          'result_image_url': null,
+          'person_image_url':
+              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/person',
+          'garment_image_url':
+              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/garment',
+          'error': null,
+          'is_saved': false,
+          'saved_at': null,
+          'created_at': '2026-11-11T00:00:00Z',
+          'updated_at': '2026-11-11T00:00:00Z',
+          'completed_at': null,
+        }),
+        202,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
+    if (options.method == 'GET' &&
+        options.path == '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}') {
+      _statusPollCount++;
+      final isSucceeded = _statusPollCount >= 2;
+      return ResponseBody.fromString(
+        jsonEncode({
+          'job_id': PreviewScreen.sampleDemoJobId,
+          'status': isSucceeded ? 'succeeded' : 'processing',
+          'result_image_url': isSucceeded
+              ? '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/image'
+              : null,
+          'person_image_url':
+              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/person',
+          'garment_image_url':
+              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/garment',
+          'error': null,
+          'is_saved': false,
+          'saved_at': null,
+          'created_at': '2026-11-11T00:00:00Z',
+          'updated_at': '2026-11-11T00:00:02Z',
+          'completed_at': isSucceeded ? '2026-11-11T00:00:04Z' : null,
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
     return ResponseBody.fromString('{}', 404);
   }
 
@@ -106,7 +160,10 @@ void main() {
   testWidgets(
     'App Shell renders UploadScreen, verifies Backend health, and navigates across all 6 go_router screens',
     (tester) async {
-      const config = AppConfig(baseUrl: 'http://10.0.2.2:8000');
+      const config = AppConfig(
+        baseUrl: 'http://10.0.2.2:8000',
+        pollingInterval: Duration(milliseconds: 200),
+      );
       final mockDio = Dio(BaseOptions(baseUrl: config.baseUrl))
         ..httpClientAdapter = _FakeBackendAdapter();
 
@@ -151,22 +208,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Xem trước ảnh đã chọn'), findsOneWidget);
 
-      // 3. Navigate to ProcessingScreen (/processing/:jobId)
-      // Note: ProcessingScreen contains an indeterminate CircularProgressIndicator,
-      // so we advance frames explicitly with pump() instead of pumpAndSettle().
+      // 3. Submit on PreviewScreen -> navigates to ProcessingScreen (/processing/:jobId)
       await tester.tap(
         find.byKey(const Key('preview_start_processing_button')),
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 50));
       expect(find.text('Đang tạo ảnh thử đồ'), findsOneWidget);
       expect(
         find.text('Job ID: ${PreviewScreen.sampleDemoJobId}'),
         findsOneWidget,
       );
 
-      // 4. Navigate to ResultScreen (/result/:jobId)
-      await tester.tap(find.byKey(const Key('processing_to_result_button')));
+      // 4. Advance polling timer -> automatically transitions to ResultScreen (/result/:jobId)
+      await tester.pump(const Duration(milliseconds: 250));
       await tester.pumpAndSettle();
       expect(find.text('Kết quả thử trang phục'), findsOneWidget);
       expect(
@@ -226,4 +281,3 @@ void main() {
     },
   );
 }
-
