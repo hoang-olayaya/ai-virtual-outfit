@@ -453,6 +453,17 @@ void main() {
               _jobPayload(jobId: jobId, status: 'succeeded'),
             );
           }
+          if (options.method == 'GET' &&
+              (options.path == '/api/v1/try-ons/$jobId/image' ||
+                  options.path.startsWith('/api/v1/try-ons/$jobId/inputs/'))) {
+            return ResponseBody.fromBytes(
+              _kSamplePngBytes,
+              200,
+              headers: {
+                Headers.contentTypeHeader: ['image/png'],
+              },
+            );
+          }
           return _jsonResponse({}, statusCode: 404);
         });
 

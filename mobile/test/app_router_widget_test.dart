@@ -149,6 +149,21 @@ class _FakeBackendAdapter implements HttpClientAdapter {
       );
     }
 
+    if (options.method == 'GET' &&
+        (options.path ==
+                '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/image' ||
+            options.path.startsWith(
+              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/',
+            ))) {
+      return ResponseBody.fromBytes(
+        _kSamplePngBytes,
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['image/png'],
+        },
+      );
+    }
+
     return ResponseBody.fromString('{}', 404);
   }
 
