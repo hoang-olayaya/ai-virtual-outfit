@@ -4,11 +4,47 @@ import 'dart:typed_data';
 import 'package:ai_virtual_outfit/app.dart';
 import 'package:ai_virtual_outfit/core/config/app_config.dart';
 import 'package:ai_virtual_outfit/core/network/dio_client.dart';
+import 'package:ai_virtual_outfit/core/services/image_picker_service.dart';
 import 'package:ai_virtual_outfit/features/try_on/presentation/screens/preview_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
+
+/// Minimal valid 1x1 transparent PNG bytes for deterministic widget tests.
+final Uint8List _kSamplePngBytes = Uint8List.fromList(<int>[
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, //
+  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, //
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, //
+  0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, //
+  0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, //
+  0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, //
+  0x42, 0x60, 0x82,
+]);
+
+class _FakeImagePickerService extends ImagePickerService {
+  int _counter = 0;
+
+  @override
+  Future<XFile?> pickImage({
+    ImageSource source = ImageSource.gallery,
+    double? maxWidth = ImagePickerService.defaultMaxDimension,
+    double? maxHeight = ImagePickerService.defaultMaxDimension,
+    int? imageQuality = ImagePickerService.defaultImageQuality,
+  }) async {
+    _counter++;
+    final fileName = 'sample_$_counter.png';
+    return XFile.fromData(
+      _kSamplePngBytes,
+      name: fileName,
+      path: '/mock/$fileName',
+      mimeType: 'image/png',
+    );
+  }
+}
 
 class _FakeBackendAdapter implements HttpClientAdapter {
   _FakeBackendAdapter({this.shouldFail = false});
@@ -79,6 +115,9 @@ void main() {
           overrides: [
             appConfigProvider.overrideWithValue(config),
             dioProvider.overrideWithValue(mockDio),
+            imagePickerServiceProvider.overrideWithValue(
+              _FakeImagePickerService(),
+            ),
           ],
           child: const VirtualOutfitApp(),
         ),
@@ -94,7 +133,20 @@ void main() {
         findsOneWidget,
       );
 
+      // Select both Person and Garment images so FR-05 readiness gate unlocks
+      await tester.ensureVisible(
+        find.byKey(const Key('pick_person_gallery_button')),
+      );
+      await tester.tap(find.byKey(const Key('pick_person_gallery_button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('pick_garment_gallery_button')),
+      );
+      await tester.tap(find.byKey(const Key('pick_garment_gallery_button')));
+      await tester.pumpAndSettle();
+
       // 2. Navigate to PreviewScreen (/preview)
+      await tester.ensureVisible(find.byKey(const Key('nav_preview_button')));
       await tester.tap(find.byKey(const Key('nav_preview_button')));
       await tester.pumpAndSettle();
       expect(find.text('Xem trước ảnh đã chọn'), findsOneWidget);

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_error.dart';
 import '../../../../core/router/app_router.dart';
+import '../../application/try_on_draft_controller.dart';
 import '../../data/models/health_status_model.dart';
 import '../../data/try_on_repository.dart';
+import '../widgets/draft_image_slot_card.dart';
 
 /// Combined snapshot of Backend Liveness (`/health`) and Readiness (`/api/v1/health/ready`).
 @immutable
@@ -47,6 +50,8 @@ final backendConnectivityProvider =
 
 /// Primary entry screen (`/`): Select Person & Garment images, view Backend connectivity,
 /// and navigate to Preview or History.
+///
+/// Implements FR-01, FR-02, FR-03, FR-04, and FR-05 in Phase F02.
 class UploadScreen extends ConsumerWidget {
   const UploadScreen({super.key});
 
@@ -54,11 +59,20 @@ class UploadScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final connectivityAsync = ref.watch(backendConnectivityProvider);
     final config = ref.watch(appConfigProvider);
+    final draft = ref.watch(tryOnDraftControllerProvider);
+    final draftController = ref.read(tryOnDraftControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Virtual Outfit Preview'),
         actions: [
+          if (draft.selectedCount > 0)
+            IconButton(
+              key: const Key('clear_draft_button'),
+              tooltip: 'Xóa toàn bộ ảnh đã chọn',
+              icon: const Icon(Icons.restart_alt_rounded),
+              onPressed: draft.isPicking ? null : draftController.clearDraft,
+            ),
           IconButton(
             key: const Key('nav_history_button'),
             tooltip: 'Lịch sử thử đồ',
@@ -79,11 +93,18 @@ class UploadScreen extends ConsumerWidget {
                 onRefresh: () => ref.invalidate(backendConnectivityProvider),
               ),
               const SizedBox(height: 20),
-              Text(
-                'Chọn ảnh đầu vào',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Chọn ảnh đầu vào',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _DraftReadinessBadge(draft: draft),
+                ],
               ),
               const SizedBox(height: 8),
               Text(
@@ -92,26 +113,67 @@ class UploadScreen extends ConsumerWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (draft.errorMessage != null) ...[
+                const SizedBox(height: 12),
+                _DraftErrorBanner(
+                  message: draft.errorMessage!,
+                  onDismiss: draftController.clearError,
+                ),
+              ],
               const SizedBox(height: 16),
-              const _ImageSlotPlaceholderCard(
-                slotKey: Key('person_image_slot'),
+              DraftImageSlotCard(
+                slotKey: const Key('person_image_slot'),
+                pickGalleryButtonKey: const Key('pick_person_gallery_button'),
+                pickCameraButtonKey: const Key('pick_person_camera_button'),
+                removeButtonKey: const Key('remove_person_image_button'),
+                previewImageKey: const Key('person_image_preview'),
                 icon: Icons.person_outline_rounded,
                 title: '1. Ảnh của bạn (Person Image)',
-                subtitle: 'Sẽ kích hoạt chọn ảnh từ thư viện ở Phase F02',
+                subtitle:
+                    'Chọn ảnh rõ mặt và dáng người đứng thẳng (JPEG/PNG/WebP ≤ 10 MB)',
+                selectedImage: draft.personImage,
+                isPicking: draft.activePickingSlot == TryOnImageSlot.person,
+                onPickFromGallery: () => draftController.pickPersonImage(
+                  source: ImageSource.gallery,
+                ),
+                onPickFromCamera: () => draftController.pickPersonImage(
+                  source: ImageSource.camera,
+                ),
+                onRemove: draftController.removePersonImage,
               ),
               const SizedBox(height: 12),
-              const _ImageSlotPlaceholderCard(
-                slotKey: Key('garment_image_slot'),
+              DraftImageSlotCard(
+                slotKey: const Key('garment_image_slot'),
+                pickGalleryButtonKey: const Key('pick_garment_gallery_button'),
+                pickCameraButtonKey: const Key('pick_garment_camera_button'),
+                removeButtonKey: const Key('remove_garment_image_button'),
+                previewImageKey: const Key('garment_image_preview'),
                 icon: Icons.checkroom_rounded,
                 title: '2. Ảnh trang phục (Garment Image)',
-                subtitle: 'Sẽ kích hoạt chọn ảnh trang phục ở Phase F02',
+                subtitle:
+                    'Chọn ảnh trang phục phẳng hoặc trên nền đơn giản (JPEG/PNG/WebP ≤ 10 MB)',
+                selectedImage: draft.garmentImage,
+                isPicking: draft.activePickingSlot == TryOnImageSlot.garment,
+                onPickFromGallery: () => draftController.pickGarmentImage(
+                  source: ImageSource.gallery,
+                ),
+                onPickFromCamera: () => draftController.pickGarmentImage(
+                  source: ImageSource.camera,
+                ),
+                onRemove: draftController.removeGarmentImage,
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
                 key: const Key('nav_preview_button'),
-                onPressed: () => context.push(AppRoutes.preview),
+                onPressed: draft.isReady
+                    ? () => context.push(AppRoutes.preview)
+                    : null,
                 icon: const Icon(Icons.visibility_rounded),
-                label: const Text('Xem trước & Xác nhận (Preview Shell)'),
+                label: Text(
+                  draft.isReady
+                      ? 'Xem trước & Xác nhận (2/2 ảnh sẵn sàng)'
+                      : 'Chọn đủ 2 ảnh để tiếp tục (${draft.selectedCount}/2)',
+                ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -123,6 +185,103 @@ class UploadScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DraftReadinessBadge extends StatelessWidget {
+  const _DraftReadinessBadge({required this.draft});
+
+  final TryOnDraftState draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isReady = draft.isReady;
+
+    return Container(
+      key: const Key('draft_readiness_badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isReady
+            ? Colors.green.withValues(alpha: 0.14)
+            : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: isReady ? Colors.green : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isReady ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+            size: 16,
+            color: isReady ? Colors.green : colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isReady ? 'Sẵn sàng thử đồ' : 'Đã chọn ${draft.selectedCount}/2',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isReady ? Colors.green.shade800 : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DraftErrorBanner extends StatelessWidget {
+  const _DraftErrorBanner({
+    required this.message,
+    required this.onDismiss,
+  });
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      key: const Key('draft_error_banner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              key: const Key('draft_error_text'),
+              style: TextStyle(
+                color: colorScheme.onErrorContainer,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('dismiss_draft_error_button'),
+            visualDensity: VisualDensity.compact,
+            onPressed: onDismiss,
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: colorScheme.onErrorContainer,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -255,66 +414,3 @@ class _BackendConnectivityCard extends StatelessWidget {
     );
   }
 }
-
-class _ImageSlotPlaceholderCard extends StatelessWidget {
-  const _ImageSlotPlaceholderCard({
-    required this.slotKey,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final Key slotKey;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      key: slotKey,
-      elevation: 0,
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: colorScheme.primaryContainer,
-              child: Icon(icon, color: colorScheme.onPrimaryContainer),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
