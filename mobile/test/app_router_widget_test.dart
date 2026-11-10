@@ -5,6 +5,7 @@ import 'package:ai_virtual_outfit/app.dart';
 import 'package:ai_virtual_outfit/core/config/app_config.dart';
 import 'package:ai_virtual_outfit/core/network/dio_client.dart';
 import 'package:ai_virtual_outfit/core/services/image_picker_service.dart';
+import 'package:ai_virtual_outfit/features/history/presentation/screens/history_screen.dart';
 import 'package:ai_virtual_outfit/features/try_on/presentation/screens/preview_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -149,12 +150,64 @@ class _FakeBackendAdapter implements HttpClientAdapter {
       );
     }
 
+    if (options.method == 'GET' && options.path == '/api/v1/history') {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'items': [
+            {
+              'job_id': HistoryScreen.sampleHistoryJobId,
+              'status': 'succeeded',
+              'person_image_url':
+                  '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/inputs/person',
+              'garment_image_url':
+                  '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/inputs/garment',
+              'result_image_url':
+                  '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/image',
+              'is_saved': true,
+              'saved_at': '2026-11-11T00:00:10Z',
+              'created_at': '2026-11-11T00:00:00Z',
+              'completed_at': '2026-11-11T00:00:05Z',
+            },
+          ],
+          'total': 1,
+          'limit': 20,
+          'offset': 0,
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
     if (options.method == 'GET' &&
-        (options.path ==
-                '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/image' ||
-            options.path.startsWith(
-              '/api/v1/try-ons/${PreviewScreen.sampleDemoJobId}/inputs/',
-            ))) {
+        options.path ==
+            '/api/v1/history/${HistoryScreen.sampleHistoryJobId}') {
+      return ResponseBody.fromString(
+        jsonEncode({
+          'job_id': HistoryScreen.sampleHistoryJobId,
+          'status': 'succeeded',
+          'person_image_url':
+              '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/inputs/person',
+          'garment_image_url':
+              '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/inputs/garment',
+          'result_image_url':
+              '/api/v1/try-ons/${HistoryScreen.sampleHistoryJobId}/image',
+          'is_saved': true,
+          'saved_at': '2026-11-11T00:00:10Z',
+          'created_at': '2026-11-11T00:00:00Z',
+          'completed_at': '2026-11-11T00:00:05Z',
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
+    if (options.method == 'GET' &&
+        (options.path.endsWith('/image') ||
+            options.path.contains('/inputs/'))) {
       return ResponseBody.fromBytes(
         _kSamplePngBytes,
         200,

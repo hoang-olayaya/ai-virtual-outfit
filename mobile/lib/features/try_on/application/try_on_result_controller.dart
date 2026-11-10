@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/network/api_error.dart';
 import '../../../../core/services/image_share_service.dart';
+import '../../history/application/history_controller.dart';
 import '../../history/data/history_repository.dart';
 import '../data/models/job_model.dart';
 import '../data/try_on_repository.dart';
@@ -426,6 +427,7 @@ class TryOnResultController extends Notifier<TryOnResultState> {
         saveSuccessCount: state.saveSuccessCount + 1,
         clearSaveError: true,
       );
+      ref.invalidate(historyControllerProvider);
       return savedJob;
     } on ApiException catch (apiError) {
       if (_isDisposed) {
