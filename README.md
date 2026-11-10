@@ -8,7 +8,7 @@ Dự án được tổ chức theo mô hình Monorepo:
 - `backend/`: FastAPI REST API và Celery Worker (xử lý tác vụ nền).
 - `infrastructure/`: Docker Compose và cấu hình môi trường hạ tầng.
 - `docs/`: Tài liệu kiến trúc và hướng dẫn vận hành.
-- `mobile/`: Ứng dụng di động Flutter (sẽ triển khai từ Phase F01).
+- `mobile/`: Ứng dụng di động Flutter (Riverpod + go_router + Dio + DTOs & Repositories).
 
 ---
 
@@ -126,11 +126,37 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke_e2e_backend.ps1
 $env:RUN_FAL_SMOKE="1"; pytest backend/tests/external/test_fal_smoke.py -v -s; Remove-Item Env:\RUN_FAL_SMOKE
 ```
 
-### 11. Trạng thái Milestone
-- **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean).
-- **Tiếp theo:** Mở khóa **Phase F01 — Flutter Shell, go_router, Dio & DTOs**.
+### 11. Khởi chạy & Kiểm thử Ứng dụng Mobile Flutter (Phase F01)
+Ứng dụng Flutter nằm tại thư mục `mobile/` và sử dụng `AppConfig` để tự động nhận diện địa chỉ Backend:
+- **Android Emulator:** Tự động kết nối tới `http://10.0.2.2:8000` (ánh xạ sang `localhost:8000` của máy chủ).
+- **iOS Simulator / Host Test:** Tự động kết nối tới `http://localhost:8000`.
+- **Điện thoại thật (cùng mạng Wi-Fi/LAN):** Truyền địa chỉ IP LAN của máy tính qua `--dart-define`:
 
-### 12. Dừng các dịch vụ
+```powershell
+cd mobile
+
+# 1. Cài đặt dependencies
+flutter pub get
+
+# 2. Phân tích mã nguồn tĩnh (Target: No issues found!)
+flutter analyze
+
+# 3. Chạy toàn bộ Unit, Widget & TCP Socket Connectivity Tests (Target: 19/19 passed)
+flutter test --reporter expanded
+
+# 4. Chạy ứng dụng trên Android Emulator (mặc định dùng http://10.0.2.2:8000)
+flutter run
+
+# 5. Chạy ứng dụng trên Điện thoại thật qua mạng LAN
+flutter run --dart-define=API_BASE_URL=http://<LAN_IP_CUA_MAY_TINH>:8000
+```
+
+### 12. Trạng thái Milestone
+- **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean).
+- **Phase F01 — Flutter Shell, go_router, Dio & DTOs:** **DONE** (`flutter analyze` 0 issues; 19/19 Flutter unit/widget/socket tests PASS; 6 màn hình khung + `TryOnRepository` + `HistoryRepository` + `ApiException` mapping hoàn chỉnh).
+- **Tiếp theo:** Mở khóa **Phase F02 — UploadScreen, PreviewScreen, image_picker & TryOnDraftController**.
+
+### 13. Dừng các dịch vụ
 ```powershell
 docker compose -f infrastructure/compose.yaml down
 ```
