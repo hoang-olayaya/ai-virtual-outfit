@@ -30,8 +30,9 @@ dependencies = [
     "pillow==10.4.0",
     "aiofiles==24.1.0",
 
-    # HTTP Client
+    # HTTP Client & Gradio Space Client
     "httpx==0.27.0",
+    "gradio_client>=1.3.0",
 ]
 
 [project.optional-dependencies]

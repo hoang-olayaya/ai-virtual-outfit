@@ -4,6 +4,7 @@ Implements the exact FastAPI contract for AI Virtual Outfit Preview.
 Runs directly with Python & Pillow without needing Docker, PostgreSQL, or Redis.
 """
 
+import asyncio
 import io
 import os
 import uuid
@@ -16,6 +17,11 @@ from fastapi import FastAPI, UploadFile, File, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageOps
+
+from app.core.config import settings
+from app.core.logging import logger
+from app.integrations.ai_provider import AIProviderException
+from app.integrations.huggingface_adapter import HuggingFaceAdapter
 
 app = FastAPI(title="AI Virtual Outfit Preview - Standalone Local Demo")
 
@@ -81,41 +87,73 @@ async def create_try_on(
     (job_dir / "person.png").write_bytes(person_bytes)
     (job_dir / "garment.png").write_bytes(garment_bytes)
 
-    # Generate composite image using Pillow (Fake AI Try-On)
-    try:
-        p_img = Image.open(io.BytesIO(person_bytes)).convert("RGBA")
-        g_img = Image.open(io.BytesIO(garment_bytes)).convert("RGBA")
+    provider_mode = (os.getenv("AI_PROVIDER") or settings.AI_PROVIDER or "fake").strip().lower()
+    job_status = "succeeded"
+    job_error = None
+    result_url = f"/api/v1/try-ons/{job_id}/image"
 
-        p_img = ImageOps.exif_transpose(p_img)
-        g_img = ImageOps.exif_transpose(g_img)
+    if provider_mode in ("huggingface", "hf"):
+        try:
+            hf_adapter = HuggingFaceAdapter()
+            ai_result = await asyncio.to_thread(
+                hf_adapter.generate_try_on,
+                uuid.UUID(job_id),
+                person_bytes,
+                garment_bytes,
+            )
+            (job_dir / "result.jpg").write_bytes(ai_result.image_bytes)
+        except AIProviderException as exc:
+            logger.error("HuggingFaceAdapter failed for job_id=%s: %s", job_id, exc.message)
+            job_status = "failed"
+            result_url = None
+            job_error = {
+                "code": exc.error_code,
+                "message": exc.message,
+            }
+        except Exception as exc:
+            logger.exception("Unexpected error in HuggingFaceAdapter for job_id=%s", job_id)
+            job_status = "failed"
+            result_url = None
+            job_error = {
+                "code": "AI_PROVIDER_ERROR",
+                "message": str(exc),
+            }
+    else:
+        # Generate composite image using Pillow (Fake AI Try-On)
+        try:
+            p_img = Image.open(io.BytesIO(person_bytes)).convert("RGBA")
+            g_img = Image.open(io.BytesIO(garment_bytes)).convert("RGBA")
 
-        # Scale garment to fit comfortably on the torso
-        pw, ph = p_img.size
-        target_gw = int(pw * 0.55)
-        scale = target_gw / max(1, g_img.width)
-        target_gh = int(g_img.height * scale)
-        g_resized = g_img.resize((target_gw, target_gh), Image.Resampling.LANCZOS)
+            p_img = ImageOps.exif_transpose(p_img)
+            g_img = ImageOps.exif_transpose(g_img)
 
-        pos_x = (pw - target_gw) // 2
-        pos_y = int(ph * 0.28)
+            # Scale garment to fit comfortably on the torso
+            pw, ph = p_img.size
+            target_gw = int(pw * 0.55)
+            scale = target_gw / max(1, g_img.width)
+            target_gh = int(g_img.height * scale)
+            g_resized = g_img.resize((target_gw, target_gh), Image.Resampling.LANCZOS)
 
-        composite = p_img.copy()
-        composite.paste(g_resized, (pos_x, pos_y), g_resized)
+            pos_x = (pw - target_gw) // 2
+            pos_y = int(ph * 0.28)
 
-        out_io = io.BytesIO()
-        composite.convert("RGB").save(out_io, format="JPEG", quality=90)
-        (job_dir / "result.jpg").write_bytes(out_io.getvalue())
-    except Exception:
-        # Fallback if image blending encounters issues
-        (job_dir / "result.jpg").write_bytes(person_bytes)
+            composite = p_img.copy()
+            composite.paste(g_resized, (pos_x, pos_y), g_resized)
+
+            out_io = io.BytesIO()
+            composite.convert("RGB").save(out_io, format="JPEG", quality=90)
+            (job_dir / "result.jpg").write_bytes(out_io.getvalue())
+        except Exception:
+            # Fallback if image blending encounters issues
+            (job_dir / "result.jpg").write_bytes(person_bytes)
 
     job_record = {
         "job_id": job_id,
-        "status": "succeeded",
-        "result_image_url": f"/api/v1/try-ons/{job_id}/image",
+        "status": job_status,
+        "result_image_url": result_url,
         "person_image_url": f"/api/v1/try-ons/{job_id}/inputs/person",
         "garment_image_url": f"/api/v1/try-ons/{job_id}/inputs/garment",
-        "error": None,
+        "error": job_error,
         "is_saved": False,
         "saved_at": None,
         "created_at": now_iso(),

@@ -51,9 +51,20 @@ class Settings(BaseSettings):
     WORKER_MAX_RETRIES: int = 2
     WORKER_RETRY_BACKOFF_SECONDS: int = 2
 
-    # AI Provider Settings ("fake" in B04; "fal" from B05/B06)
+    # AI Provider Settings ("fake" in B04; "fal" or "huggingface" from B05/B06)
     AI_PROVIDER: str = "fake"
     FAKE_AI_PROCESSING_DELAY_SECONDS: float = 0.0
+
+    # External AI Provider (Hugging Face Spaces via gradio_client - Free ZeroGPU)
+    HF_TOKEN: Union[str, None] = None
+    HF_SPACE_ID: str = "yisol/IDM-VTON"
+    HF_API_NAME: str = "/tryon"
+    HF_GARMENT_DESCRIPTION: str = "Upper body garment"
+    HF_AUTO_MASK: bool = True
+    HF_AUTO_CROP: bool = False
+    HF_DENOISE_STEPS: int = 30
+    HF_SEED: int = 42
+    HF_TIMEOUT_SECONDS: float = 180.0
 
     # External AI Provider (fal.ai) - Optional in bootstrap/B04; configured in B05/B06
     FAL_KEY: Union[str, None] = None

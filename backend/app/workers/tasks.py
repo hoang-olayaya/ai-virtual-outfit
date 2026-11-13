@@ -47,8 +47,22 @@ class WorkerExecutionOutcome:
 
 
 def build_default_ai_provider() -> AIProvider:
-    """Create the configured AI provider instance (FalAdapter in B05/B06, FakeAIProvider in B04/dev)."""
+    """Create the configured AI provider instance (HuggingFaceAdapter, FalAdapter, or FakeAIProvider)."""
     provider_name = (settings.AI_PROVIDER or "fake").strip().lower()
+    if provider_name in ("huggingface", "hf"):
+        from app.integrations.huggingface_adapter import HuggingFaceAdapter
+
+        return HuggingFaceAdapter(
+            hf_token=settings.HF_TOKEN,
+            space_id=settings.HF_SPACE_ID,
+            api_name=settings.HF_API_NAME,
+            garment_description=settings.HF_GARMENT_DESCRIPTION,
+            auto_mask=settings.HF_AUTO_MASK,
+            auto_crop=settings.HF_AUTO_CROP,
+            denoise_steps=settings.HF_DENOISE_STEPS,
+            seed=settings.HF_SEED,
+            timeout_seconds=settings.HF_TIMEOUT_SECONDS,
+        )
     if provider_name == "fal":
         from app.integrations.fal_adapter import FalAdapter
 
@@ -66,7 +80,9 @@ def build_default_ai_provider() -> AIProvider:
         )
     if provider_name == "fake":
         return FakeAIProvider(delay_seconds=settings.FAKE_AI_PROCESSING_DELAY_SECONDS)
-    raise ValueError(f"Unsupported AI_PROVIDER '{settings.AI_PROVIDER}'. Expected 'fal' or 'fake'.")
+    raise ValueError(
+        f"Unsupported AI_PROVIDER '{settings.AI_PROVIDER}'. Expected 'huggingface', 'fal', or 'fake'."
+    )
 
 
 async def _run_pipeline_with_dependencies(
