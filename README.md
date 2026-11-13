@@ -141,24 +141,29 @@ flutter pub get
 # 2. Phân tích mã nguồn tĩnh (Target: No issues found!)
 flutter analyze
 
-# 3. Chạy toàn bộ Unit, Widget & TCP Socket Connectivity Tests (Target: 38/38 passed)
+# 3. Chạy toàn bộ Unit, Widget, Failure Scenarios & Real TCP E2E Tests (Target: 43/43 passed)
 flutter test --reporter expanded
 
-# 4. Chạy ứng dụng trên Android Emulator (mặc định dùng http://10.0.2.2:8000)
+# 4. Chạy kịch bản nghiệm thu tổng thể Release Gate (Backend + Mobile + Security Audit)
+cd ..
+powershell -ExecutionPolicy Bypass -File scripts/smoke_e2e_release_gate.ps1
+
+# 5. Chạy ứng dụng trên Android Emulator (mặc định dùng http://10.0.2.2:8000)
+cd mobile
 flutter run
 
-# 5. Chạy ứng dụng trên Điện thoại thật qua mạng LAN
+# 6. Chạy ứng dụng trên Điện thoại thật qua mạng LAN
 flutter run --dart-define=API_BASE_URL=http://<LAN_IP_CUA_MAY_TINH>:8000
 ```
 
 ### 12. Trạng thái Milestone
-- **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean).
+- **BACKEND GATE (G1):** **PASSED** (135/135 tests pass, 0 fail, 0 skip; 4 containers healthy; E2E smoke 10/10 pass; secret scan clean; báo cáo `docs/backend_gate_report.md`).
 - **Phase F01 — Flutter Shell, go_router, Dio & DTOs:** **DONE** (`flutter analyze` 0 issues; 19/19 Flutter unit/widget/socket tests PASS; 6 màn hình khung + `TryOnRepository` + `HistoryRepository` + `ApiException` mapping hoàn chỉnh).
 - **Phase F02 — UploadScreen, PreviewScreen, image_picker & TryOnDraftController:** **DONE** (`TryOnDraftController` quản lý trạng thái nháp bất biến, đóng picker không mất ảnh cũ, kiểm tra sớm dung lượng/file rỗng, xem trước song song trên `PreviewScreen`).
 - **Phase F03 — Submit + Processing + Polling:** **DONE** (`flutter analyze` 0 issues; 27/27 Flutter tests PASS; `TryOnSubmissionController` chống double-submit & bảo toàn `Idempotency-Key` theo fingerprint (T10); `JobStatusController` chạy single-flight polling loop, chịu lỗi mạng tạm thời T09 `network failure != job failed`, tạm dừng/tiếp tục theo `AppLifecycleState`, và tự động điều hướng sang `ResultScreen` khi `succeeded`).
 - **Phase F04 — ResultScreen, Before/After Compare, Save & Share:** **DONE** (`flutter analyze` 0 issues; 33/33 Flutter tests PASS; `TryOnResultController` tải byte ảnh kết quả & input, `TryOnComparisonView` 3 chế độ đối chiếu, `ImageShareService` dò magic header ghi file tạm + `share_plus`, lưu lịch sử idempotent T11 và cô lập hoàn toàn `Save != Share != Retry`).
 - **Phase F05 — History / List / Detail / Delete:** **DONE** (`flutter analyze` 0 issues; 38/38 Flutter tests PASS; `HistoryController` & `HistoryDetailController` quản lý danh sách lịch sử phân trang từ Backend, khôi phục đầy đủ danh sách và bộ 3 ảnh đối chiếu Trước/Sau sau khi restart app theo Kịch bản T11, xử lý 404 Not Found, chia sẻ và xóa có hộp thoại xác nhận kèm phục hồi lỗi).
-- **Tiếp theo:** Mở khóa **GATE-FE — Kiểm thử End-to-End & Nghiệm thu tổng thể**.
+- **RELEASE GATE (G2 / GATE-FE):** **PASSED — MVP DONE** (`flutter analyze` 0 issues; 43/43 Flutter Unit, Widget, Failure Scenarios & Real TCP Full-Lifecycle E2E tests PASS; nghiệm thu 100% FR-01..FR-16, NFR-01..NFR-08 và T01..T12; 0 secret leak; biên bản nghiệm thu `docs/release_gate_report.md`).
 
 ### 13. Dừng các dịch vụ
 ```powershell
